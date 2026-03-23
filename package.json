@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "xlsx": "^0.18.5"
@@ -19,7 +21,14 @@
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.2"
   },
-  "keywords": ["ai-readiness", "ai-maturity", "enterprise-ai", "ai-assessment", "itil4", "ai-governance"],
+  "keywords": [
+    "ai-readiness",
+    "ai-maturity",
+    "enterprise-ai",
+    "ai-assessment",
+    "itil4",
+    "ai-governance"
+  ],
   "author": "Gagandeep Singh | AI Practice",
   "license": "MIT"
 }
