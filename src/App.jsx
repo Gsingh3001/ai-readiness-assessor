@@ -14,7 +14,7 @@
 //  - Session expiry: 8 hours with toast notification
 // ============================================================
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import LoginScreen from './components/LoginScreen.jsx'
 import AdminPortal from './components/AdminPortal.jsx'
@@ -58,17 +58,19 @@ const PRACTICES = [
   { id:'healthsafety',     name:'Health & Safety',                domain:'Operations',  icon:'⬡' },
   { id:'environmental',    name:'Environmental & Sustainability', domain:'Operations',  icon:'◎' },
   { id:'fieldservice',     name:'Field Service',                  domain:'Operations',  icon:'⬡' },
+  { id:'data_readiness',  name:'Data Readiness',                 domain:'Technology',  icon:'◈' },
+  { id:'ai_literacy',     name:'AI Literacy & Training',         domain:'Business',    icon:'◎' },
 ]
 
 // ─── 6 AI Readiness Dimensions ─────────────────────────────────────────────
 const DIM_KEYS = ['DQ','TR','TS','GE','CR','VR']
 const DIMS = {
-  DQ: { label:'Data Quality',         weight:0.25, color:'#6366F1', desc:'Data availability, accuracy, lineage & governance' },
-  TR: { label:'Tech Readiness',        weight:0.20, color:'#0EA5E9', desc:'Infrastructure, APIs, AI tooling & integration' },
-  TS: { label:'Talent & Skills',       weight:0.20, color:'#F59E0B', desc:'AI literacy, data skills & upskilling maturity' },
+  DQ: { label:'Data Quality',         weight:0.30, color:'#6366F1', desc:'Data availability, accuracy, lineage & governance' },
+  TR: { label:'Tech Readiness',        weight:0.18, color:'#0EA5E9', desc:'Infrastructure, APIs, AI tooling & integration' },
+  TS: { label:'Talent & Skills',       weight:0.22, color:'#F59E0B', desc:'AI literacy, data skills & upskilling maturity' },
   GE: { label:'Governance & Ethics',   weight:0.15, color:'#EF4444', desc:'AI policy, ethics, bias monitoring & regulatory' },
-  CR: { label:'Change Readiness',      weight:0.10, color:'#F97316', desc:'Culture, leadership sponsorship & change mgmt' },
-  VR: { label:'Value & ROI',           weight:0.10, color:'#10B981', desc:'Use case clarity, business cases & benefit tracking' },
+  CR: { label:'Change Readiness',      weight:0.08, color:'#F97316', desc:'Culture, leadership sponsorship & change mgmt' },
+  VR: { label:'Value & ROI',           weight:0.07, color:'#10B981', desc:'Use case clarity, business cases & benefit tracking' },
 }
 
 const LEVELS = ['Exploring','Piloting','Scaling']
@@ -339,28 +341,44 @@ export default function App() {
 
   async function handleDownloadPDF() {
     if (!session || session.role !== 'admin') return
-    setPdfProgress('Initialising PDF engine…')
+    setPdfProgress('Preparing vector PDF report…')
     try {
-      const { generateFullReport } = await import('./components/PDFGenerator.js')
-      const assessmentId = generateAssessmentId()
-      await generateFullReport({
-        assessmentData: {
-          orgName:     config.org || 'Organisation',
-          industry:    config.industry,
-          region:      REGIONS.find(r => r.id === config.region)?.label || config.region,
-          size:        config.size,
-          orgOverall,
-          orgDimScores,
-          fnScores,
-          assessmentId,
-          dateStr: new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' }),
-        },
-        onProgress: msg => setPdfProgress(msg),
-      })
-      showToast('PDF generated successfully!', 'success')
+      const { pdf }                  = await import('@react-pdf/renderer')
+      const { default: PDFDocument } = await import('./components/pdf/PDFDocument.jsx')
+
+      const assessmentData = {
+        orgName:         config.org || 'Organisation',
+        industry:        config.industry,
+        region:          REGIONS.find(r => r.id === config.region)?.label || config.region,
+        orgSize:         config.size || 'medium',
+        overallScore:    orgOverall,
+        dimScores:       orgDimScores,
+        functionScores:  fnScores,
+        assessedBy:      session.name || session.username,
+        completedAt:     Date.now(),
+      }
+
+      setPdfProgress('Rendering pages…')
+      const doc = React.createElement(PDFDocument, { assessmentData })
+      const blob = await pdf(doc).toBlob()
+
+      const dateStr  = new Date().toISOString().slice(0,10)
+      const safeName = (config.org || 'Organisation').replace(/[^a-z0-9]/gi, '-')
+      const filename = `${safeName}-AI-Readiness-Report-${dateStr}.pdf`
+
+      const url  = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href     = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      showToast('PDF report downloaded!', 'success')
     } catch(e) {
       console.error('PDF error:', e)
-      showToast('PDF generation failed. Check console for details.', 'error')
+      showToast('PDF generation failed. Check console.', 'error')
     } finally {
       setPdfProgress(null)
     }
