@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Enterprise AI Readiness Assessment Platform — function-level AI maturity assessment for business leaders",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -20,14 +19,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.2"
   },
-  "keywords": [
-    "ai-readiness",
-    "ai-maturity",
-    "enterprise-ai",
-    "ai-assessment",
-    "itil4",
-    "ai-governance"
-  ],
-  "author": "Gagandeep Singh | ITSM Practice",
+  "keywords": ["ai-readiness", "ai-maturity", "enterprise-ai", "ai-assessment", "itil4", "ai-governance"],
+  "author": "Gagandeep Singh | AI Practice",
   "license": "MIT"
 }
