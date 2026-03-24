@@ -266,6 +266,7 @@ export default function AdminPortal({ session, onClose, onDownloadPDF, onSaveToC
   const [toast, setToast] = useState(null)
   const [cloudReports, setCloudReports] = useState(null)   // null = not loaded
   const [cloudLoading, setCloudLoading] = useState(false)
+  const [cloudError,   setCloudError]   = useState(null)   // error message string | null
   const [deletingBlob, setDeletingBlob] = useState(null)
 
   useEffect(() => {
@@ -284,14 +285,27 @@ export default function AdminPortal({ session, onClose, onDownloadPDF, onSaveToC
 
   async function fetchCloudReports() {
     setCloudLoading(true)
+    setCloudError(null)
     try {
       const res = await fetch('/api/reports')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        // Read JSON body for the detailed error message from api/reports.js
+        let detail = `HTTP ${res.status}`
+        try {
+          const body = await res.json()
+          detail = body.detail || body.error || detail
+        } catch (_) {}
+        setCloudError({ status: res.status, message: detail })
+        return
+      }
       const data = await res.json()
       setCloudReports(Array.isArray(data) ? data : [])
     } catch(e) {
-      showToast(`Failed to load cloud reports: ${e.message}`, 'error')
-      setCloudReports([])
+      // Network error — likely running locally without vercel dev
+      setCloudError({
+        status: 0,
+        message: 'Could not reach /api/reports. Run `vercel dev` locally, or check the deployment on Vercel.',
+      })
     } finally {
       setCloudLoading(false)
     }
@@ -352,7 +366,7 @@ export default function AdminPortal({ session, onClose, onDownloadPDF, onSaveToC
 
   function handleTabChange(id) {
     setTab(id)
-    if (id === 'cloud' && cloudReports === null) fetchCloudReports()
+    if (id === 'cloud' && cloudReports === null && !cloudError) fetchCloudReports()
   }
 
   return (
@@ -512,17 +526,46 @@ export default function AdminPortal({ session, onClose, onDownloadPDF, onSaveToC
                 {cloudLoading ? '⏳ Loading…' : '↺ Refresh'}
               </button>
             </div>
-            {cloudLoading && cloudReports === null ? (
+            {/* ── Error state ── */}
+            {cloudError && (
+              <div style={{ background: `${C.red}12`, border: `1px solid ${C.red}33`, borderRadius: 12, padding: '24px 28px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                  <div style={{ fontSize: 28, lineHeight: 1 }}>⚠️</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: C.red, marginBottom: 6 }}>
+                      {cloudError.status === 503 ? 'Blob Storage Not Connected' : 'Failed to Load Cloud Reports'}
+                    </div>
+                    <div style={{ fontSize: 13, color: C.muted, marginBottom: 14, lineHeight: 1.6 }}>
+                      {cloudError.message}
+                    </div>
+                    {cloudError.status === 503 && (
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 16px', fontSize: 12, color: C.muted, lineHeight: 1.9 }}>
+                        <strong style={{ color: C.text, display: 'block', marginBottom: 6 }}>🔧 One-time setup (30 seconds):</strong>
+                        <span style={{ display: 'block' }}>1. Open <strong style={{ color: C.blue }}>vercel.com</strong> → your project → <strong>Storage</strong> tab</span>
+                        <span style={{ display: 'block' }}>2. Select your existing Blob store → <strong>Settings → Connected Projects</strong></span>
+                        <span style={{ display: 'block' }}>3. Add <strong style={{ color: C.accent }}>ai-readiness-assessor</strong> and save</span>
+                        <span style={{ display: 'block' }}>4. Vercel auto-injects <code style={{ background: C.card, padding: '1px 5px', borderRadius: 4 }}>BLOB_READ_WRITE_TOKEN</code> — redeploy and refresh</span>
+                      </div>
+                    )}
+                    <button onClick={fetchCloudReports} style={{ marginTop: 14, padding: '7px 16px', background: `${C.blue}22`, border: `1px solid ${C.blue}44`, borderRadius: 8, fontSize: 12, fontWeight: 700, color: C.blue, cursor: 'pointer' }}>
+                      ↺ Retry
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!cloudError && cloudLoading && cloudReports === null ? (
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '40px', textAlign: 'center', color: C.muted, fontSize: 14 }}>
                 Loading cloud reports…
               </div>
-            ) : cloudReports && cloudReports.length === 0 ? (
+            ) : !cloudError && cloudReports && cloudReports.length === 0 ? (
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '48px', textAlign: 'center' }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>☁</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>No cloud reports yet</div>
-                <div style={{ fontSize: 13, color: C.muted }}>Open an assessment and click <strong style={{ color: C.green }}>☁ Save to Cloud</strong> to upload a report.</div>
+                <div style={{ fontSize: 13, color: C.muted }}>Reports are auto-saved to cloud when an assessment is submitted.</div>
               </div>
-            ) : cloudReports && cloudReports.length > 0 ? (
+            ) : !cloudError && cloudReports && cloudReports.length > 0 ? (
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
@@ -564,11 +607,11 @@ export default function AdminPortal({ session, onClose, onDownloadPDF, onSaveToC
                   </tbody>
                 </table>
               </div>
-            ) : (
+            ) : !cloudError ? (
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '40px', textAlign: 'center', color: C.muted, fontSize: 14 }}>
-                Click Refresh to load cloud reports.
+                Click <strong>Refresh</strong> to load cloud reports.
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
