@@ -126,10 +126,129 @@ function donutSVG(score, size = 100) {
 }
 
 // ─── MAIN GENERATOR ──────────────────────────────────────────────────────────
+// ─── Roadmap Goal Metadata ────────────────────────────────────────────────────
+const GOAL_META = {
+  automation:  { label:'Process Automation',      color:'#6366F1', icon:'⚙', bars:[[2,6],[8,18],[19,30]], actions:['Map and digitise all high-volume manual processes','Deploy RPA + AI for finance, HR and operations workflows','Expand automation to cross-functional enterprise processes'] },
+  revenue:     { label:'Revenue Growth',           color:'#10B981', icon:'↗', bars:[[5,9],[12,24],[25,36]], actions:['Build AI lead scoring and pipeline forecasting models','Launch personalisation engine for sales & marketing','Scale AI-driven revenue optimisation across all channels'] },
+  cx:          { label:'Customer Experience',      color:'#F59E0B', icon:'◉', bars:[[5,12],[14,24],[25,36]], actions:['Deploy AI chatbot for first-line customer support','Implement real-time personalisation across touchpoints','Build predictive CX model (churn, NPS, lifetime value)'] },
+  efficiency:  { label:'Operational Efficiency',   color:'#0EA5E9', icon:'⚡', bars:[[2,6],[8,18],[19,36]], actions:['Identify top 10 efficiency use cases by function','Deploy AI-assisted scheduling, routing and resource planning','AI-driven continuous process improvement at scale'] },
+  risk:        { label:'Risk & Compliance',        color:'#EF4444', icon:'⬡', bars:[[1,6],[8,18],[19,36]], actions:['Classify AI systems under EU AI Act risk tiers','Deploy AI-powered compliance monitoring and alerting','Fully automated risk signal aggregation and board reporting'] },
+  innovation:  { label:'Innovation & R&D',         color:'#8B5CF6', icon:'◈', bars:[[8,15],[18,27],[27,36]], actions:['Establish AI sandbox for R&D experimentation','Launch AI-accelerated product development pilots','AI-driven innovation pipeline and IP generation platform'] },
+  workforce:   { label:'Workforce Transformation', color:'#F97316', icon:'◎', bars:[[1,6],[6,18],[19,36]], actions:['Launch mandatory AI literacy programme (80% target)','Train AI champions and build internal AI guild','Embed AI into every role; AI-first hiring & culture'] },
+  data:        { label:'Data Intelligence',        color:'#06B6D4', icon:'▲', bars:[[1,6],[6,12],[12,36]], actions:['Audit all data assets for quality, lineage & completeness','Build enterprise data platform and feature store','AI-driven data quality platform with continuous monitoring'] },
+}
+
+// ─── Build WOW Roadmap SVG ────────────────────────────────────────────────────
+function buildRoadmapSVG(activeGoalIds, w = 680) {
+  const goals = activeGoalIds.length > 0 ? activeGoalIds : ['automation','efficiency','data','workforce']
+  const activeGoals = goals.map(id => ({ id, ...(GOAL_META[id] || GOAL_META.data) }))
+
+  const LABEL_W = 132
+  const CHART_W = w - LABEL_W
+  const mx = m => LABEL_W + (m / 36) * CHART_W
+
+  const PHASE_H = 46
+  const LANE_H  = 22
+  const LANE_GAP = 5
+  const CM_H    = 20
+  const totalH  = PHASE_H + activeGoals.length * (LANE_H + LANE_GAP) + CM_H + LANE_GAP + 14
+
+  const PHASES = [
+    { label:'Foundation', ms:'M1–6',   start:0,  end:6,  color:'#6366F1' },
+    { label:'Pilot & Build', ms:'M7–18', start:6, end:18, color:'#0EA5E9' },
+    { label:'Scale & Optimise', ms:'M19–36', start:18, end:36, color:'#10B981' },
+  ]
+  const MILESTONES = [
+    { m:1,  label:'Governance',  color:'#6366F1' },
+    { m:3,  label:'Data Audit',  color:'#6366F1' },
+    { m:6,  label:'Literacy\nMet', color:'#a5b4fc' },
+    { m:9,  label:'Pilots Live', color:'#0EA5E9' },
+    { m:18, label:'Scale\nApproved', color:'#7dd3fc' },
+    { m:24, label:'AI CoE',      color:'#10B981' },
+    { m:36, label:'AI-Native\n★', color:'#6ee7b7' },
+  ]
+
+  let s = `<svg width="${w}" height="${totalH}" viewBox="0 0 ${w} ${totalH}" xmlns="http://www.w3.org/2000/svg">`
+
+  // Phase column backgrounds
+  PHASES.forEach(p => {
+    const x1 = mx(p.start), x2 = mx(p.end)
+    s += `<rect x="${x1}" y="0" width="${x2-x1-1}" height="${totalH}" fill="${p.color}" opacity="0.06" rx="0"/>`
+    s += `<rect x="${x1}" y="0" width="${x2-x1-1}" height="${PHASE_H}" fill="${p.color}" opacity="0.18"/>`
+    s += `<text x="${(x1+x2)/2}" y="17" text-anchor="middle" font-size="10" font-weight="800" fill="${p.color}" font-family="Inter,system-ui">${p.label}</text>`
+    s += `<text x="${(x1+x2)/2}" y="30" text-anchor="middle" font-size="8" fill="${p.color}" font-family="Inter,system-ui" opacity="0.7">${p.ms}</text>`
+  })
+
+  // Phase vertical dividers
+  s += `<line x1="${LABEL_W}" y1="0" x2="${LABEL_W}" y2="${totalH}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`
+  ;[6, 18, 36].forEach(m => {
+    s += `<line x1="${mx(m)}" y1="0" x2="${mx(m)}" y2="${totalH}" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-dasharray="5,4"/>`
+  })
+
+  // Month tick marks every 6
+  for (let m = 0; m <= 36; m += 6) {
+    const x = mx(m)
+    s += `<line x1="${x}" y1="${PHASE_H-6}" x2="${x}" y2="${PHASE_H}" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>`
+  }
+
+  // Label column opaque background
+  s += `<rect x="0" y="0" width="${LABEL_W}" height="${totalH}" fill="#0F1929"/>`
+  s += `<text x="6" y="14" font-size="8" font-weight="700" fill="rgba(255,255,255,0.2)" font-family="Inter,system-ui" letter-spacing="1">PRIORITY</text>`
+  s += `<text x="${LABEL_W/2+8}" y="14" text-anchor="middle" font-size="8" font-weight="700" fill="rgba(255,255,255,0.2)" font-family="Inter,system-ui" letter-spacing="1">GOAL STREAM</text>`
+
+  // Goal swim lanes
+  activeGoals.forEach((g, i) => {
+    const color = g.color
+    const y = PHASE_H + i * (LANE_H + LANE_GAP)
+    const lbl = (g.label || '').length > 20 ? (g.label || '').slice(0,18)+'…' : (g.label || '')
+
+    // Lane alternating bg
+    if (i % 2 === 0) s += `<rect x="${LABEL_W}" y="${y}" width="${CHART_W}" height="${LANE_H}" fill="${color}" opacity="0.04"/>`
+
+    // Priority number
+    s += `<rect x="4" y="${y+4}" width="18" height="14" rx="4" fill="${color}" opacity="0.9"/>`
+    s += `<text x="13" y="${y+14}" text-anchor="middle" font-size="8" font-weight="900" fill="#fff" font-family="Inter,system-ui">P${i+1}</text>`
+
+    // Goal label
+    s += `<text x="28" y="${y+LANE_H/2+3}" font-size="8.5" font-weight="700" fill="${color}" font-family="Inter,system-ui">${lbl}</text>`
+
+    // Work bars (foundation/pilot/scale intensities)
+    ;(g.bars || []).forEach((bar, bi) => {
+      const bx1 = mx(bar[0])
+      const bx2 = mx(bar[1])
+      const opac = bi === 0 ? 0.4 : bi === 1 ? 0.65 : 0.9
+      s += `<rect x="${bx1+2}" y="${y+4}" width="${bx2-bx1-4}" height="${LANE_H-8}" fill="${color}" opacity="${opac}" rx="3"/>`
+      if (bx2 - bx1 > 28) {
+        const ltext = bi === 0 ? 'Build' : bi === 1 ? 'Deploy' : 'Scale'
+        s += `<text x="${(bx1+bx2)/2}" y="${y+LANE_H/2+3}" text-anchor="middle" font-size="7" font-weight="700" fill="rgba(255,255,255,0.85)" font-family="Inter,system-ui">${ltext}</text>`
+      }
+    })
+  })
+
+  // Change Management lane
+  const cmY = PHASE_H + activeGoals.length * (LANE_H + LANE_GAP) + LANE_GAP
+  s += `<rect x="${LABEL_W}" y="${cmY}" width="${CHART_W}" height="${CM_H}" fill="rgba(255,255,255,0.03)"/>`
+  s += `<text x="28" y="${cmY+CM_H/2+3}" font-size="8" font-weight="600" fill="rgba(255,255,255,0.35)" font-family="Inter,system-ui">Change Management</text>`
+  s += `<rect x="${mx(0)+2}" y="${cmY+4}" width="${mx(36)-mx(0)-4}" height="${CM_H-8}" fill="rgba(255,255,255,0.06)" rx="3"/>`
+  s += `<text x="${(mx(0)+mx(36))/2}" y="${cmY+CM_H/2+3}" text-anchor="middle" font-size="7.5" fill="rgba(255,255,255,0.28)" font-family="Inter,system-ui">Communications · Training · Stakeholder Engagement · Leadership Alignment · Culture</text>`
+
+  // Milestone diamonds (draw last so they sit on top)
+  MILESTONES.forEach(ms => {
+    const x = mx(ms.m)
+    const y = PHASE_H - 4
+    const size = 5
+    s += `<polygon points="${x},${y-size} ${x+size},${y} ${x},${y+size} ${x-size},${y}" fill="${ms.color}" stroke="#0F1929" stroke-width="1.5"/>`
+  })
+
+  s += '</svg>'
+  return { svg: s, activeGoals }
+}
+
 export function generateAIReadinessPDFHTML({
   orgName = 'Organisation', industry = '', region = '', orgSize = 'medium',
   overallScore = 1.0, dimScores = {}, functionScores = {},
-  assessedBy = '', completedAt = Date.now(), assessmentId = ''
+  assessedBy = '', completedAt = Date.now(), assessmentId = '',
+  goals = []
 }) {
   const dateStr = new Date(completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   const sc = scoreColor(overallScore)
@@ -804,50 +923,85 @@ export function generateAIReadinessPDFHTML({
   <div class="page-footer"><span>${orgName} · AI Readiness Assessment · Confidential</span><span>Page 13</span></div>
 </div>`
 
-  // ─── S12: ROADMAP ─────────────────────────────────────────────────────────
+  // ─── S12: ROADMAP (WOW Visual) ────────────────────────────────────────────
+  const { svg: timelineSVG, activeGoals } = buildRoadmapSVG(goals || [], 680)
+
+  const goalChipsHTML = activeGoals.length > 0 ? `
+    <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;">
+      ${activeGoals.map((g, i) => `
+        <div style="display:inline-flex;align-items:center;gap:6px;background:${g.color}18;border:1px solid ${g.color}40;border-radius:20px;padding:4px 10px;">
+          <span style="font-size:8.5px;background:${g.color};color:#fff;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0;">${i+1}</span>
+          <span style="font-size:10px;font-weight:700;color:${g.color};">${g.label}</span>
+        </div>`).join('')}
+    </div>` : ''
+
   const roadmap = `
-<div class="page page-alt">
-  <div class="section-label">Section 12 · Investment Roadmap</div>
-  <h2>3-Phase AI Transformation Plan</h2>
-  <p style="margin-bottom:20px;">Sequenced AI transformation roadmap for ${orgName} at <strong style="color:${sc}">${ml}</strong> maturity. Each phase builds the foundation for the next.</p>
-  ${[
-    { n:1, label:'Foundation', time:'Months 1–6', color:'#6366F1', budget: orgMeta.budget,
-      focus:'Data quality, governance, AI literacy baseline, regulatory compliance',
-      actions:['Commission enterprise-wide data quality audit across all critical data domains','Appoint Chief AI Officer and form AI Steering Committee with board sponsorship','Launch mandatory AI literacy e-learning (target: 80% completion across all staff)','Conduct EU AI Act risk classification for all existing and planned AI systems','Identify and prioritise 3–5 high-ROI AI use cases with defined business cases'] },
-    { n:2, label:'Pilot', time:'Months 7–18', color:'#0EA5E9', budget: orgMeta.budget,
-      focus:'MVP AI use cases, MLOps platform, model governance, KPI instrumentation',
-      actions:['Build and deploy 2–3 AI pilots in highest-readiness functions with dedicated teams','Establish MLOps platform (Databricks/Azure ML/Vertex AI) for model lifecycle management','Implement AI Model Risk Management framework with bias audits and explainability tooling','Instrument ROI tracking and A/B testing frameworks for each active AI pilot','Expand AI literacy to advanced tracks for data scientists, engineers, and AI champions'] },
-    { n:3, label:'Scale', time:'Months 19–36', color:'#10B981', budget: orgMeta.budget,
-      focus:'Enterprise AI platform, autonomous optimisation, value capture at scale',
-      actions:['Scale proven pilots to full production across all eligible organisational functions','Deploy unified AI data platform and enterprise feature store for model reuse','Launch AI Centre of Excellence with internal build capability and external partnership model','Automate model monitoring, retraining, drift detection, and performance degradation alerts','Report AI programme ROI to board; commission next 3-year AI strategy and roadmap'] },
-  ].map(phase => `
-    <div class="phase-card" style="border-left-color:${phase.color};">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div style="width:32px;height:32px;border-radius:8px;background:${phase.color};color:#fff;font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${phase.n}</div>
+<div style="background:linear-gradient(150deg,#0A0E1A 0%,#0F1929 45%,#111827 100%);padding:40px 52px 70px;min-height:1050px;max-height:1120px;overflow:hidden;position:relative;page-break-after:always;">
+  <svg style="position:absolute;top:0;right:0;opacity:.05;pointer-events:none" width="550" height="550" viewBox="0 0 550 550">
+    <circle cx="460" cy="80" r="260" fill="#6366F1"/>
+    <circle cx="360" cy="460" r="160" fill="#0EA5E9"/>
+    <polygon points="60,60 200,60 130,190" fill="#F59E0B" opacity=".7"/>
+  </svg>
+  <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:14px;">Section 12 · AI Transformation Roadmap</div>
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+    <div>
+      <h2 style="color:#fff;font-size:26px;font-weight:900;margin-bottom:4px;letter-spacing:-.5px;">36-Month AI Transformation Roadmap</h2>
+      <p style="color:rgba(255,255,255,.45);font-size:11.5px;margin:0;">${orgName} · Starting at <strong style="color:${sc}">${ml}</strong> · Goal-Driven Execution Plan</p>
+    </div>
+    <div style="background:linear-gradient(135deg,rgba(99,102,241,.85),rgba(139,92,246,.75));border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:14px 18px;min-width:175px;text-align:center;flex-shrink:0;">
+      <div style="font-size:8px;letter-spacing:2px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:4px;">North Star · Month 36</div>
+      <div style="font-size:24px;font-weight:900;color:#fff;line-height:1;">AI-Native</div>
+      <div style="font-size:9.5px;color:rgba(255,255,255,.55);margin-top:3px;">Target Score 4.2+</div>
+      <div style="display:flex;align-items:center;gap:5px;margin-top:8px;">
+        <div style="height:4px;flex:1;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:${pct(overallScore)}%;background:linear-gradient(90deg,#6366F1,#10B981);border-radius:2px;"></div>
+        </div>
+        <span style="font-size:8.5px;color:rgba(255,255,255,.4);white-space:nowrap;">${overallScore.toFixed(1)}→4.2</span>
+      </div>
+    </div>
+  </div>
+
+  ${goalChipsHTML}
+
+  <div style="border-radius:12px;overflow:hidden;margin-bottom:16px;">
+    ${timelineSVG}
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+    ${[
+      { n:1, label:'Foundation',       time:'M1–6',   color:'#6366F1', budget:orgMeta.budget,
+        items:['AI Governance & CAIO','Data quality audit','AI literacy programme','EU AI Act classification','3–5 use case business cases'] },
+      { n:2, label:'Pilot & Build',    time:'M7–18',  color:'#0EA5E9', budget:orgMeta.budget,
+        items:['2–3 high-ROI AI pilots','MLOps platform (Azure/GCP)','Model risk & explainability','ROI instrumentation & A/B tests','Advanced AI skills tracks'] },
+      { n:3, label:'Scale & Optimise', time:'M19–36', color:'#10B981', budget:orgMeta.budget,
+        items:['Pilots to full production','AI Centre of Excellence','Enterprise feature store','Automated model monitoring','3-year AI strategy refresh'] },
+    ].map(p => `
+      <div style="background:${p.color}14;border:1px solid ${p.color}30;border-radius:10px;padding:11px 13px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:22px;height:22px;background:${p.color};border-radius:6px;color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${p.n}</div>
           <div>
-            <div style="font-size:15px;font-weight:800;color:${phase.color}">${phase.label}</div>
-            <div style="font-size:10.5px;color:#64748b;">${phase.time} · ${phase.focus}</div>
+            <div style="font-size:10.5px;font-weight:800;color:${p.color};">${p.label}</div>
+            <div style="font-size:8.5px;color:rgba(255,255,255,.35);">${p.time} · Est. ${p.budget}</div>
           </div>
         </div>
-        <div style="background:${phase.color}22;border-radius:8px;padding:6px 12px;text-align:center;">
-          <div style="font-size:9px;color:#64748b;margin-bottom:2px;">Est. Investment (${orgMeta.label})</div>
-          <div style="font-size:12px;font-weight:800;color:${phase.color}">${phase.budget}</div>
-        </div>
-      </div>
-      <div class="two-col">
-        ${phase.actions.map(a => `<div style="display:flex;gap:7px;font-size:11px;color:#475569;margin-bottom:6px;"><span style="color:${phase.color};flex-shrink:0;font-weight:700;">→</span>${a}</div>`).join('')}
-      </div>
-    </div>`).join('')}
-  <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:8px;">
-    <div style="flex:1;background:#6366F1;"></div><div style="flex:2;background:#0EA5E9;"></div><div style="flex:2;background:#10B981;"></div>
+        ${p.items.map(item => `<div style="display:flex;gap:5px;font-size:9.5px;color:rgba(255,255,255,.5);margin-bottom:4px;"><span style="color:${p.color};flex-shrink:0;font-weight:700;">→</span>${item}</div>`).join('')}
+      </div>`).join('')}
   </div>
-  <div style="display:flex;font-size:9.5px;margin-top:4px;color:#64748b;">
-    <div style="flex:1;text-align:center;color:#6366F1;font-weight:700;">Foundation (M1–6)</div>
-    <div style="flex:2;text-align:center;color:#0EA5E9;font-weight:700;">Pilot (M7–18)</div>
-    <div style="flex:2;text-align:center;color:#10B981;font-weight:700;">Scale (M19–36)</div>
+
+  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;">
+    <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:1.5px;text-transform:uppercase;flex-shrink:0;">Dependencies</div>
+    ${[
+      ['Data Foundation','unlocks all AI use cases','#6366F1'],
+      ['AI Literacy','enables cultural adoption','#F97316'],
+      ['Governance Framework','de-risks regulatory exposure','#EF4444'],
+      ['MLOps Platform','enables scale from pilots','#0EA5E9'],
+    ].map(([k,v,c]) => `<div style="display:flex;gap:4px;align-items:center;font-size:9px;color:rgba(255,255,255,.4);"><span style="color:${c};font-weight:700;">${k}</span><span>→</span>${v}</div>`).join('')}
   </div>
-  <div class="page-footer"><span>${orgName} · AI Readiness Assessment · Confidential</span><span>Page 14</span></div>
+
+  <div style="position:absolute;bottom:18px;left:52px;right:52px;display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;font-size:10px;color:rgba(255,255,255,.25);">
+    <span>${orgName} · AI Readiness Assessment · Confidential</span><span>Page 14</span>
+  </div>
 </div>`
 
   // ─── S13: ROI ─────────────────────────────────────────────────────────────
@@ -932,36 +1086,37 @@ export function generateAIReadinessPDFHTML({
 </div>`
 
   // ─── APPENDIX ─────────────────────────────────────────────────────────────
+  // Limit function table rows so content fits on one page without bleeding
+  const appendixFns = sortedFns.slice(0, 20)
   const appendix = `
 <div class="page page-light">
   <div class="section-label">Appendix · Full Data &amp; Metadata</div>
-  <h2>Assessment Data &amp; Methodology Notes</h2>
-  <div class="two-col" style="margin-top:16px;">
-    <div>
-      <div class="card card-accent">
-        <h4 style="margin-bottom:10px;">Assessment Metadata</h4>
-        ${[['Organisation',orgName],['Industry',industry||'Not specified'],['Region',region||'Not specified'],['Organisation Size',orgMeta.label],['Assessment ID',assessmentId||'N/A'],['Assessed By',assessedBy||'Self-Assessment'],['Report Date',dateStr],['Framework Version','AI Readiness Assessor v2.0'],['Question Bank','v2.0 · 205 questions · 27 functions'],['Methodology','Weighted dimension scoring, 1–5 scale']].map(([l,v])=>`
-          <div style="display:flex;margin-bottom:7px;">
-            <span style="width:130px;font-size:11px;color:#94a3b8;flex-shrink:0;">${l}</span>
-            <span style="font-size:11px;color:#334155;font-weight:500;">${v}</span>
+  <h2 style="margin-bottom:12px;">Assessment Data &amp; Methodology Notes</h2>
+  <div class="two-col" style="margin-top:10px;">
+    <div style="page-break-inside:avoid;">
+      <div class="card card-accent" style="margin-bottom:0;page-break-inside:avoid;">
+        <h4 style="margin-bottom:8px;">Assessment Metadata</h4>
+        ${[['Organisation',orgName],['Industry',industry||'Not specified'],['Region',region||'Not specified'],['Org Size',orgMeta.label],['Assessment ID',assessmentId||'N/A'],['Assessed By',assessedBy||'Self-Assessment'],['Report Date',dateStr],['Framework','AI Readiness Assessor v2.0'],['Question Bank','v2.0 · 205 questions · 27 functions'],['Methodology','Weighted dimension scoring, 1–5 scale']].map(([l,v])=>`
+          <div style="display:flex;margin-bottom:5px;">
+            <span style="width:120px;font-size:10.5px;color:#94a3b8;flex-shrink:0;">${l}</span>
+            <span style="font-size:10.5px;color:#334155;font-weight:500;">${v}</span>
           </div>`).join('')}
       </div>
     </div>
-    <div>
-      <div class="card">
-        <h4 style="margin-bottom:10px;">Full Function Score Table</h4>
-        <table style="font-size:10px;">
+    <div style="page-break-inside:avoid;">
+      <div class="card" style="margin-bottom:0;page-break-inside:avoid;">
+        <h4 style="margin-bottom:8px;">Function Score Summary (Top ${appendixFns.length})</h4>
+        <table style="font-size:9.5px;">
           <thead><tr><th>Function</th><th>Score</th><th>Tier</th></tr></thead>
           <tbody>
-            ${sortedFns.map(([id,s])=>`<tr><td>${id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</td><td style="color:${scoreColor(s)};font-weight:700;">${fmt(s)}</td><td><span style="font-size:9px;color:${scoreColor(s)}">${maturityLabel(s)}</span></td></tr>`).join('')}
+            ${appendixFns.map(([id,s])=>`<tr style="page-break-inside:avoid;"><td style="padding:5px 8px;">${id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</td><td style="padding:5px 8px;color:${scoreColor(s)};font-weight:700;">${fmt(s)}</td><td style="padding:5px 8px;"><span style="font-size:8.5px;color:${scoreColor(s)}">${maturityLabel(s)}</span></td></tr>`).join('')}
           </tbody>
         </table>
       </div>
     </div>
   </div>
-  <div class="insight-box" style="margin-top:16px;">
-    <strong>Disclaimer:</strong>
-    <p style="margin-top:6px;font-size:11.5px;">This report is based on a structured self-assessment across ${fnCount} organisational functions. ROI projections are indicative and based on industry benchmarks for ${orgMeta.label} organisations. All financial figures should be validated with detailed feasibility analysis before capital allocation. This report is confidential and intended solely for the named organisation's board and C-suite leadership.</p>
+  <div class="insight-box" style="margin-top:12px;page-break-inside:avoid;">
+    <strong>Disclaimer:</strong> <span style="font-size:11px;color:#3730a3;">This report is based on a structured self-assessment across ${fnCount} organisational functions. ROI projections are indicative and based on industry benchmarks for ${orgMeta.label} organisations. All financial figures should be validated with detailed feasibility analysis before capital allocation. This report is confidential and intended solely for the named organisation's board and C-suite leadership.</span>
   </div>
   <div class="page-footer"><span>${orgName} · AI Readiness Assessment · Confidential</span><span>Page 17</span></div>
 </div>`

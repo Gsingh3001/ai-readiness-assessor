@@ -108,6 +108,17 @@ const ORG_SIZES = [
   { id:'global',     label:'Global (10,000+)' },
 ]
 
+const AI_GOALS = [
+  { id:'automation',  icon:'⚙', label:'Process Automation',      desc:'Automate repetitive tasks at scale',     color:'#6366F1' },
+  { id:'revenue',     icon:'↗', label:'Revenue Growth',           desc:'AI-driven sales & marketing uplift',     color:'#10B981' },
+  { id:'cx',          icon:'◉', label:'Customer Experience',      desc:'Personalise customer journeys',          color:'#F59E0B' },
+  { id:'efficiency',  icon:'⚡', label:'Operational Efficiency',   desc:'Reduce costs, boost throughput',         color:'#0EA5E9' },
+  { id:'risk',        icon:'⬡', label:'Risk & Compliance',        desc:'AI governance & regulatory excellence',  color:'#EF4444' },
+  { id:'innovation',  icon:'◈', label:'Innovation & R&D',         desc:'Accelerate product innovation',          color:'#8B5CF6' },
+  { id:'workforce',   icon:'◎', label:'Workforce Transformation', desc:'Build AI-first culture & capability',    color:'#F97316' },
+  { id:'data',        icon:'▲', label:'Data Intelligence',        desc:'Insight-led decision making',            color:'#06B6D4' },
+]
+
 // ─── QUESTION BANK LOADER ──────────────────────────────────────────────────
 async function loadQuestionBank() {
   try {
@@ -229,7 +240,7 @@ export default function App() {
   const [questions,   setQuestions]   = useState([])
   const [qbLoading,   setQbLoading]   = useState(false)
   const [qbError,     setQbError]     = useState(null)
-  const [config,      setConfig]      = useState({ org:'', role:'', industry:'', region:'', size:'', level:'Exploring' })
+  const [config,      setConfig]      = useState({ org:'', role:'', industry:'', region:'', size:'', level:'Exploring', goals:[] })
   const [answers,     setAnswers]     = useState({})
   const [activePractice, setActivePractice] = useState(PRACTICES[0].id)
   const [toast,       setToast]       = useState(null)
@@ -310,7 +321,7 @@ export default function App() {
     clearSession()
     setSession(null)
     setAnswers({})
-    setConfig({ org:'', role:'', industry:'', region:'', size:'', level:'Exploring' })
+    setConfig({ org:'', role:'', industry:'', region:'', size:'', level:'Exploring', goals:[] })
     setPage('login')
     setShowAdmin(false)
   }
@@ -380,6 +391,7 @@ export default function App() {
         assessedBy:     session.name || session.username,
         completedAt:    Date.now(),
         assessmentId:   '',
+        goals:          config.goals || [],
       }
 
       const html = generateAIReadinessPDFHTML(assessmentData)
@@ -528,7 +540,7 @@ export default function App() {
             </select>
           </div>
 
-          <div style={{ marginBottom:28 }}>
+          <div style={{ marginBottom:20 }}>
             <label style={{ display:'block', fontSize:11, fontWeight:700, color:COLORS.text, marginBottom:10, textTransform:'uppercase', letterSpacing:1 }}>Assessment Level</label>
             <div style={{ display:'flex', gap:10 }}>
               {LEVELS.map(l => (
@@ -539,6 +551,33 @@ export default function App() {
               ))}
             </div>
             <div style={{ fontSize:11, color:COLORS.muted, marginTop:6 }}>Exploring = awareness · Piloting = capability · Scaling = optimisation</div>
+          </div>
+
+          <div style={{ marginBottom:28 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:COLORS.text, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>
+              Key AI Goals
+              <span style={{ textTransform:'none', letterSpacing:0, fontWeight:500, color:COLORS.muted }}> — Select your priorities</span>
+            </label>
+            <p style={{ fontSize:11, color:COLORS.muted, marginBottom:10, lineHeight:1.5 }}>Drives a personalised, goal-driven roadmap in your assessment report.</p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {AI_GOALS.map(g => {
+                const sel = (config.goals || []).includes(g.id)
+                return (
+                  <button key={g.id} onClick={() => setConfig(c => {
+                    const gs = c.goals || []
+                    return { ...c, goals: sel ? gs.filter(x => x !== g.id) : [...gs, g.id] }
+                  })}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', border:`2px solid ${sel ? g.color : COLORS.border}`, borderRadius:12, background: sel ? `${g.color}10` : '#fff', cursor:'pointer', textAlign:'left', transition:'all 0.15s' }}>
+                    <span style={{ fontSize:15, flexShrink:0, opacity: sel ? 1 : 0.45 }}>{g.icon}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color: sel ? g.color : COLORS.text }}>{g.label}</div>
+                      <div style={{ fontSize:10, color:COLORS.muted, lineHeight:1.3 }}>{g.desc}</div>
+                    </div>
+                    {sel && <span style={{ fontSize:10, color:g.color, fontWeight:900, flexShrink:0, background:`${g.color}22`, borderRadius:4, padding:'1px 5px' }}>✓</span>}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {(() => {
