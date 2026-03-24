@@ -192,7 +192,7 @@ export function generateAIReadinessPDFHTML({
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; font-size: 13px; color: #1e293b; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { padding: 48px 56px; min-height: 1050px; position: relative; page-break-after: always; }
+    .page { padding: 40px 52px 70px; min-height: 1050px; max-height: 1120px; overflow: hidden; position: relative; page-break-after: always; }
     .page-light { background: #ffffff; }
     .page-alt { background: #f8fafc; }
     .page-break { page-break-after: always; }
@@ -216,8 +216,8 @@ export function generateAIReadinessPDFHTML({
     .bar-track { flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
     .bar-fill { height: 100%; border-radius: 4px; }
     .bar-score { font-size: 11px; font-weight: 700; width: 36px; text-align: right; }
-    .toc-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
-    .toc-num { width: 32px; height: 32px; border-radius: 8px; background: #6366F1; color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .toc-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid #f1f5f9; }
+    .toc-num { width: 28px; height: 28px; border-radius: 7px; background: #6366F1; color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .toc-dots { flex: 1; border-bottom: 2px dotted #cbd5e1; }
     table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
     th { background: #f1f5f9; padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -228,7 +228,7 @@ export function generateAIReadinessPDFHTML({
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
     .flex-row { display: flex; gap: 16px; align-items: flex-start; }
-    .page-footer { position: absolute; bottom: 28px; left: 56px; right: 56px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 10px; color: #94a3b8; }
+    .page-footer { position: absolute; bottom: 18px; left: 52px; right: 52px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 10px; color: #94a3b8; background:#fff; }
     .phase-card { border-left: 4px solid; border-radius: 12px; padding: 16px 20px; margin-bottom: 14px; background: #f8fafc; }
     .risk-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 800; letter-spacing: 0.5px; }
     @media print {
@@ -305,8 +305,8 @@ export function generateAIReadinessPDFHTML({
   const toc = `
 <div class="page page-light">
   <div class="section-label">Navigation</div>
-  <h2 style="font-size:30px;color:#0f172a;margin-bottom:6px;">Table of Contents</h2>
-  <p style="margin-bottom:36px;">Prepared exclusively for the Board and C-Suite. Assessment ID: <strong style="font-family:monospace;color:#6366F1;">${assessmentId}</strong></p>
+  <h2 style="font-size:26px;color:#0f172a;margin-bottom:4px;">Table of Contents</h2>
+  <p style="margin-bottom:16px;font-size:12px;">Prepared exclusively for the Board and C-Suite. Assessment ID: <strong style="font-family:monospace;color:#6366F1;">${assessmentId || 'N/A'}</strong></p>
   ${[
     ['01','CEO Briefing','Board-Ready Summary · Financial Impact · Strategic Decisions','3'],
     ['02','CIO / CTO Technical Scorecard','Infrastructure · MLOps · AI Platform Readiness','4'],
@@ -315,7 +315,7 @@ export function generateAIReadinessPDFHTML({
     ['05','Assessment Methodology','Framework · Scoring Formula · Dimensions · Maturity Tiers','7'],
     ['06','Current State Analysis','Overall Score · Maturity Distribution · Benchmarks','8'],
     ['07','Dimensional Analysis','6-Dimension Radar · Deep Dive per Dimension','9'],
-    ['08','Function Performance Heatmap','All ${fnCount} Functions Scored · Domain Grouping','10'],
+    ['08','Function Performance Heatmap',`All ${fnCount} Functions Scored · Domain Grouping`,'10'],
     ['09','Gap Analysis','Current vs Target · Priority Matrix · Quick Wins','11'],
     ['10','AI Use Case Register','Prioritised Use Cases · Value · Complexity','12'],
     ['11','Risk Register','Risk Identification · Likelihood/Impact · Controls','13'],
@@ -326,15 +326,15 @@ export function generateAIReadinessPDFHTML({
     <div class="toc-row">
       <div class="toc-num">${num}</div>
       <div style="flex:1;">
-        <div style="font-weight:700;color:#1e293b;font-size:13px;">${title}</div>
-        <div style="font-size:10.5px;color:#94a3b8;margin-top:2px;">${sub}</div>
+        <div style="font-weight:700;color:#1e293b;font-size:12.5px;">${title}</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${sub}</div>
       </div>
       <div class="toc-dots"></div>
-      <div style="font-weight:800;color:#6366F1;font-size:13px;">pg.${pg}</div>
+      <div style="font-weight:800;color:#6366F1;font-size:12px;white-space:nowrap;">pg. ${pg}</div>
     </div>`).join('')}
-  <div class="insight-box" style="margin-top:32px;">
-    <strong>How to Read This Report:</strong>
-    <p style="margin-top:6px;">Scores use a 1–5 AI Readiness scale: <strong>1.0–1.8 = AI Unaware → 4.2–5.0 = AI-Native</strong>. Each of the ${fnCount} functions is scored across 6 weighted dimensions (DQ·TR·TS·GE·CR·VR). The target benchmark is <strong>3.4 (AI Scaling)</strong>, consistent with Fortune 500 AI leaders. Sections 01–04 are role-specific executive briefings for immediate C-suite action.</p>
+  <div style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px 16px;margin-top:14px;page-break-inside:avoid;">
+    <span style="font-size:11.5px;font-weight:700;color:#3730a3;">How to Read This Report: </span>
+    <span style="font-size:11.5px;color:#3730a3;">Scores use a 1–5 scale: <strong>1.0–1.8 = AI Unaware → 4.2–5.0 = AI-Native</strong>. Target benchmark: <strong>3.4 (AI Scaling)</strong>. Sections 01–04 are role-specific C-suite briefings. Sections 05–14 provide the full analytical detail.</span>
   </div>
   <div class="page-footer"><span>AI Readiness Assessor · AI Practice · Confidential</span><span>© ${new Date().getFullYear()} AI Practice</span></div>
 </div>`
