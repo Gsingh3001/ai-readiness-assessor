@@ -347,7 +347,41 @@ export default function App() {
     })
     setAssessmentSaved(true)
     showToast(`Assessment saved — ID: ${record.id}`, 'success')
+    // Auto-upload report to Vercel Blob in background — no user action required
+    autoSaveToCloud()
     return record
+  }
+
+  // autoSaveToCloud — fire-and-forget background upload, no UI blocking
+  async function autoSaveToCloud() {
+    try {
+      const { generateAIReadinessPDFHTML } = await import('./components/PDFGeneratorHTML.js')
+      const html = generateAIReadinessPDFHTML({
+        orgName:        config.org || 'Organisation',
+        industry:       config.industry,
+        region:         REGIONS.find(r => r.id === config.region)?.label || config.region,
+        orgSize:        config.size || 'medium',
+        overallScore:   orgOverall,
+        dimScores:      orgDimScores,
+        functionScores: flattenFnScores(fnScores),
+        assessedBy:     session?.name || session?.username,
+        completedAt:    Date.now(),
+        goals:          config.goals || [],
+      })
+      const res = await fetch('/api/reports', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          htmlContent: html,
+          username:    session?.username || 'unknown',
+          orgName:     config.org || 'Organisation',
+          timestamp:   Date.now(),
+        }),
+      })
+      if (res.ok) showToast('Report saved to cloud ☁', 'info')
+    } catch(e) {
+      console.warn('Auto cloud save failed (non-critical):', e)
+    }
   }
 
   // Flatten fnScores { id: { overall, dimScores } } → { id: score } for PDF
@@ -399,6 +433,20 @@ export default function App() {
       win.document.write(html)
       win.document.close()
       showToast('Report ready — press Ctrl+P to save as PDF', 'success')
+
+      // Auto-upload to Vercel Blob in background — no user action required
+      fetch('/api/reports', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          htmlContent: html,
+          username:    session?.username || 'admin',
+          orgName:     assessmentData.orgName,
+          timestamp:   Date.now(),
+        }),
+      }).then(r => { if (r.ok) showToast('Report auto-saved to cloud ☁', 'info') })
+        .catch(e => console.warn('Auto cloud save (PDF):', e))
+
     } catch(e) {
       console.error('PDF error:', e)
       win.close()
