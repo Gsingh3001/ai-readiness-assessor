@@ -16,7 +16,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
-import LoginScreen from './components/LoginScreen.jsx'
+import LoginScreen  from './components/LoginScreen.jsx'
+import LandingPage  from './components/LandingPage.jsx'
 import AdminPortal from './components/AdminPortal.jsx'
 import UserReport  from './components/UserReport.jsx'
 import {
@@ -235,7 +236,8 @@ function Toast({ msg, type }) {
 
 // ─── MAIN APP ───────────────────────────────────────────────────────────────
 export default function App() {
-  const [page,        setPage]        = useState('login')   // login|welcome|setup|assess|report|admin
+  const [page,        setPage]        = useState('home')    // home|welcome|setup|assess|report
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const [session,     setSession]     = useState(null)
   const [questions,   setQuestions]   = useState([])
   const [qbLoading,   setQbLoading]   = useState(false)
@@ -310,6 +312,7 @@ export default function App() {
 
   function handleLogin(ses) {
     setSession(ses)
+    setShowLoginModal(false)
     const saved = ls.get(PROGRESS_KEY)
     if (saved?.answers) setAnswers(saved.answers)
     if (saved?.config)  setConfig(saved.config)
@@ -322,8 +325,9 @@ export default function App() {
     setSession(null)
     setAnswers({})
     setConfig({ org:'', role:'', industry:'', region:'', size:'', level:'Exploring', goals:[] })
-    setPage('login')
+    setPage('home')
     setShowAdmin(false)
+    setShowLoginModal(false)
   }
 
   const handleAnswer = useCallback((qId, value) => {
@@ -503,8 +507,16 @@ export default function App() {
   }
 
   // ── LOGIN ──
-  if (!session || page === 'login') {
-    return <LoginScreen onLogin={handleLogin} />
+  // ── Landing page (public) ──
+  if (!session || page === 'home') {
+    return (
+      <>
+        <LandingPage onShowLogin={() => setShowLoginModal(true)} />
+        {showLoginModal && (
+          <LoginScreen onLogin={handleLogin} onClose={() => setShowLoginModal(false)} />
+        )}
+      </>
+    )
   }
 
   // ── TOP NAV ──

@@ -108,7 +108,7 @@ function ParticleCanvas() {
 }
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
-export default function LoginScreen({ onLogin }) {
+export default function LoginScreen({ onLogin, onClose }) {
   const [username, setUsername]     = useState('')
   const [password, setPassword]     = useState('')
   const [remember,  setRemember]    = useState(false)
@@ -142,12 +142,17 @@ export default function LoginScreen({ onLogin }) {
     onLogin(session)
   }
 
-  return (
+  const inner = (
     <div style={{
-      minHeight: '100vh',
+      minHeight: onClose ? 'unset' : '100vh',
       display: 'flex',
       fontFamily: "'Segoe UI', Inter, system-ui, sans-serif",
       background: '#08090C',
+      borderRadius: onClose ? 20 : 0,
+      overflow: 'hidden',
+      maxWidth: onClose ? 900 : 'unset',
+      width: onClose ? '100%' : 'unset',
+      position: 'relative',
     }}>
       {/* ── LEFT HERO PANEL ── */}
       <div style={{
@@ -329,14 +334,19 @@ export default function LoginScreen({ onLogin }) {
             </button>
           </form>
 
-          {/* Hint */}
-          <div style={{ marginTop: 28, padding: '14px 16px', background: '#F1F5F9', borderRadius: 10, fontSize: 12, color: '#64748B', lineHeight: 1.7 }}>
-            <strong style={{ color: '#475569' }}>Demo credentials:</strong><br />
-            Admin: <code style={{ fontFamily: 'monospace', background: '#E2E8F0', padding: '1px 5px', borderRadius: 4 }}>Admin / Admin</code><br />
-            User: <code style={{ fontFamily: 'monospace', background: '#E2E8F0', padding: '1px 5px', borderRadius: 4 }}>User / User</code>
-          </div>
         </div>
       </div>
+
+      {/* Close button — only shown in modal mode */}
+      {onClose && (
+        <button
+          onClick={onClose}
+          style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, width: 32, height: 32, fontSize: 18, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+          aria-label="Close"
+        >
+          ×
+        </button>
+      )}
 
       <style>{`
         @keyframes fadeSlideIn {
@@ -349,4 +359,17 @@ export default function LoginScreen({ onLogin }) {
       `}</style>
     </div>
   )
+
+  if (onClose) {
+    return (
+      <div
+        onClick={e => { if (e.target === e.currentTarget) onClose() }}
+        style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
+      >
+        {inner}
+      </div>
+    )
+  }
+
+  return inner
 }
