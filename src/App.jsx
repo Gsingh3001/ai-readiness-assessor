@@ -30,7 +30,8 @@ const APP_VERSION = '2.0.0'
 const QB_PATH = '/ai-question-bank.xlsx'
 
 // ─── STORAGE KEYS ──────────────────────────────────────────────────────────
-const PROGRESS_KEY = 'arap_progress_v2'  // { answers, config, activePractice }
+const progressKey = (u) => `arap_progress_v2_${u}`  // per-user progress isolation
+const submitKey   = (u) => `arap_submitted_${u}`     // per-user lock flag
 
 // ─── 25 Organisational Functions ───────────────────────────────────────────
 const PRACTICES = [
@@ -261,10 +262,12 @@ export default function App() {
     const ses = getSession()
     if (ses) {
       setSession(ses)
-      // Restore progress
-      const saved = ls.get(PROGRESS_KEY)
+      // Restore per-user progress (never bleeds between users)
+      const saved = ls.get(progressKey(ses.username))
       if (saved?.answers) setAnswers(saved.answers)
       if (saved?.config)  setConfig(saved.config)
+      // Restore lock state — if this user already submitted, re-lock immediately
+      if (ls.get(submitKey(ses.username))) setAssessmentSaved(true)
       setPage('welcome')
     }
     // Load QB
@@ -288,12 +291,12 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [session])
 
-  // ── Auto-save progress ──
+  // ── Auto-save progress (per-user, stops once submitted) ──
   useEffect(() => {
-    if (Object.keys(answers).length > 0 && session) {
-      ls.set(PROGRESS_KEY, { answers, config, savedAt: Date.now() })
+    if (Object.keys(answers).length > 0 && session && !assessmentSaved) {
+      ls.set(progressKey(session.username), { answers, config, savedAt: Date.now() })
     }
-  }, [answers, config, session])
+  }, [answers, config, session, assessmentSaved])
 
   // ── Scores (memoised) ──
   const { fnScores, orgDimScores, orgOverall } = useMemo(
@@ -313,9 +316,15 @@ export default function App() {
   function handleLogin(ses) {
     setSession(ses)
     setShowLoginModal(false)
-    const saved = ls.get(PROGRESS_KEY)
+    // Load THIS user's progress — never another user's data
+    const saved = ls.get(progressKey(ses.username))
     if (saved?.answers) setAnswers(saved.answers)
+    else setAnswers({})
     if (saved?.config)  setConfig(saved.config)
+    else setConfig({ org:'', role:'', industry:'', region:'', size:'', level:'Exploring', goals:[] })
+    // Restore lock state
+    const alreadySubmitted = !!ls.get(submitKey(ses.username))
+    setAssessmentSaved(alreadySubmitted)
     setPage('welcome')
     showToast(`Welcome back, ${ses.name}!`, 'success')
   }
@@ -325,16 +334,19 @@ export default function App() {
     setSession(null)
     setAnswers({})
     setConfig({ org:'', role:'', industry:'', region:'', size:'', level:'Exploring', goals:[] })
+    setAssessmentSaved(false)
     setPage('home')
     setShowAdmin(false)
     setShowLoginModal(false)
   }
 
   const handleAnswer = useCallback((qId, value) => {
+    if (assessmentSaved) return   // 🔒 locked after submission
     setAnswers(prev => ({ ...prev, [qId]: value }))
-  }, [])
+  }, [assessmentSaved])
 
   function handleSaveAssessment() {
+    if (assessmentSaved) return   // already locked — ignore duplicate calls
     const assessmentId = generateAssessmentId()
     const record = saveAssessment({
       orgName:     config.org,
@@ -349,8 +361,10 @@ export default function App() {
       config,
       assessmentId,
     })
+    // Persist lock flag for this user — survives page refresh and re-login
+    ls.set(submitKey(session.username), { lockedAt: Date.now(), assessmentId: record.id })
     setAssessmentSaved(true)
-    showToast(`Assessment saved — ID: ${record.id}`, 'success')
+    showToast(`Assessment submitted & locked — ID: ${record.id}`, 'success')
     // Auto-upload report to Vercel Blob in background — no user action required
     autoSaveToCloud()
     return record
@@ -581,8 +595,19 @@ export default function App() {
               </div>
             ))}
           </div>
+          {assessmentSaved && (
+            <div style={{ background:'rgba(5,150,105,0.15)', border:'1px solid rgba(5,150,105,0.4)', borderRadius:12, padding:'16px 24px', marginBottom:20, textAlign:'center' }}>
+              <div style={{ fontSize:22, marginBottom:4 }}>🔒</div>
+              <div style={{ fontSize:15, fontWeight:700, color:'#34D399', marginBottom:4 }}>Assessment Submitted & Locked</div>
+              <div style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>Your responses are final. Contact your admin to re-open.</div>
+            </div>
+          )}
           <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
-            {config.org ? (
+            {assessmentSaved ? (
+              <button onClick={() => setPage('report')} style={{ background:'linear-gradient(135deg,#059669,#047857)', border:'none', borderRadius:12, padding:'14px 44px', fontSize:15, fontWeight:700, color:'#fff', cursor:'pointer', letterSpacing:'-0.3px', boxShadow:'0 4px 20px rgba(5,150,105,0.4)' }}>
+                View Submitted Report →
+              </button>
+            ) : config.org ? (
               <button onClick={() => setPage('assess')} style={{ background:'#6366F1', border:'none', borderRadius:12, padding:'14px 44px', fontSize:15, fontWeight:700, color:'#fff', cursor:'pointer', letterSpacing:'-0.3px', boxShadow:'0 4px 20px rgba(99,102,241,0.4)' }}>
                 {totalAnswered > 0 ? `Continue Assessment (${pctComplete}% done)` : 'Start Assessment →'}
               </button>
@@ -591,9 +616,9 @@ export default function App() {
                 Setup Organisation →
               </button>
             )}
-            {totalAnswered >= 10 && (
+            {!assessmentSaved && totalAnswered >= 10 && (
               <button onClick={() => setPage('report')} style={{ background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:12, padding:'14px 28px', fontSize:14, fontWeight:600, color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>
-                View Report →
+                Preview Report →
               </button>
             )}
           </div>
@@ -737,18 +762,27 @@ export default function App() {
                 })}
               </div>
             ))}
-            {/* Save button */}
+            {/* Save / Lock button */}
             <div style={{ padding:'12px 14px', borderTop:`1px solid ${COLORS.border}`, marginTop:8 }}>
-              {totalAnswered >= 10 && (
-                <button onClick={() => { handleSaveAssessment(); setPage('report') }}
-                  style={{ width:'100%', padding:'9px', background:'linear-gradient(135deg, #6366F1, #4F46E5)', border:'none', borderRadius:8, fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', marginBottom:6 }}>
-                  Save & View Report
-                </button>
+              {assessmentSaved ? (
+                <div style={{ background:'rgba(5,150,105,0.12)', border:'1px solid rgba(5,150,105,0.35)', borderRadius:8, padding:'9px 10px', textAlign:'center' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#34D399' }}>🔒 Submitted & Locked</div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginTop:2 }}>Read-only mode</div>
+                </div>
+              ) : (
+                <>
+                  {totalAnswered >= 10 && (
+                    <button onClick={() => { handleSaveAssessment(); setPage('report') }}
+                      style={{ width:'100%', padding:'9px', background:'linear-gradient(135deg, #6366F1, #4F46E5)', border:'none', borderRadius:8, fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', marginBottom:6 }}>
+                      Submit & View Report
+                    </button>
+                  )}
+                  <button onClick={() => setPage('report')} disabled={totalAnswered < 10}
+                    style={{ width:'100%', padding:'7px', background:'none', border:`1px solid ${COLORS.border}`, borderRadius:8, fontSize:11, color:totalAnswered >= 10 ? COLORS.indigo : COLORS.muted, cursor:totalAnswered >= 10 ? 'pointer' : 'default' }}>
+                    Preview Report {totalAnswered >= 10 ? '→' : `(need ${10 - totalAnswered} more)`}
+                  </button>
+                </>
               )}
-              <button onClick={() => setPage('report')} disabled={totalAnswered < 10}
-                style={{ width:'100%', padding:'7px', background:'none', border:`1px solid ${COLORS.border}`, borderRadius:8, fontSize:11, color:totalAnswered >= 10 ? COLORS.indigo : COLORS.muted, cursor:totalAnswered >= 10 ? 'pointer' : 'default' }}>
-                Preview Report {totalAnswered >= 10 ? '→' : `(need ${10 - totalAnswered} more)`}
-              </button>
             </div>
           </div>
 
@@ -788,6 +822,17 @@ export default function App() {
               )}
             </div>
 
+            {/* Locked banner */}
+            {assessmentSaved && (
+              <div style={{ display:'flex', alignItems:'center', gap:12, background:'rgba(5,150,105,0.12)', border:'1px solid rgba(5,150,105,0.35)', borderRadius:10, padding:'12px 16px', marginBottom:20 }}>
+                <span style={{ fontSize:20 }}>🔒</span>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#34D399' }}>Assessment Submitted & Locked</div>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)' }}>Your answers are read-only. Contact your admin to re-open.</div>
+                </div>
+              </div>
+            )}
+
             {/* Questions */}
             {qbLoading ? (
               <div style={{ textAlign:'center', padding:'60px 20px', color:COLORS.muted, fontSize:14 }}>Loading question bank…</div>
@@ -811,12 +856,17 @@ export default function App() {
                           <div style={{ fontSize:13, color:COLORS.text, lineHeight:1.6, marginBottom:10 }}>{q.text}</div>
                           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                             {(['Yes','Partial','No']).map(opt => (
-                              <button key={opt} onClick={() => handleAnswer(q.questionId, opt)}
+                              <button key={opt}
+                                onClick={() => handleAnswer(q.questionId, opt)}
+                                disabled={assessmentSaved}
                                 style={{
                                   padding:'6px 16px', borderRadius:8, border:`1.5px solid ${ans===opt ? (opt==='Yes'?'#059669':opt==='Partial'?'#D97706':'#DC2626') : COLORS.border}`,
                                   background: ans===opt ? (opt==='Yes'?'#DCFCE7':opt==='Partial'?'#FEF3C7':'#FEE2E2') : '#fff',
                                   color: ans===opt ? (opt==='Yes'?'#059669':opt==='Partial'?'#D97706':'#DC2626') : COLORS.muted,
-                                  fontSize:12, fontWeight:600, cursor:'pointer', transition:'all 0.12s',
+                                  fontSize:12, fontWeight:600,
+                                  cursor: assessmentSaved ? 'default' : 'pointer',
+                                  opacity: assessmentSaved && !ans ? 0.4 : 1,
+                                  transition:'all 0.12s',
                                 }}>
                                 {opt}
                               </button>
