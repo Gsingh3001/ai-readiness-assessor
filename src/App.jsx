@@ -21,7 +21,7 @@ import LandingPage  from './components/LandingPage.jsx'
 import AdminPortal from './components/AdminPortal.jsx'
 import UserReport  from './components/UserReport.jsx'
 import {
-  initUsers, authenticate, getSession, clearSession, saveAssessment,
+  initUsers, syncUsersFromCloud, authenticate, getSession, clearSession, saveAssessment,
   generateAssessmentId, timeUntilExpiry, ls,
 } from './auth.js'
 
@@ -259,6 +259,7 @@ export default function App() {
   // ── Bootstrap ──
   useEffect(() => {
     initUsers()
+    syncUsersFromCloud()   // pull latest users from Blob → overwrite local cache (silent)
     const ses = getSession()
     if (ses) {
       setSession(ses)

@@ -10,7 +10,8 @@
  *   GET    /api/reports  — list all reports (?username=X filters by user)
  *   DELETE /api/reports?pathname=X — delete a specific report
  *
- * Blob naming: reports/<username>/<YYYY-MM-DD>_<orgSlug>_<ts>.html
+ * Blob naming: arap/reports/<username>/<YYYY-MM-DD>_<orgSlug>_<ts>.html
+ * Root prefix "arap/" isolates all AI-Assessor blobs from itil4-assessor ("reports/")
  */
 
 import { put, list, del } from '@vercel/blob'
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
       const user = slugify(username || 'unknown')
       const org  = slugify(orgName || 'report')
       const date = formatDate(ts)
-      const pathname = `reports/${user}/${date}_${org}_${ts}.html`
+      const pathname = `arap/reports/${user}/${date}_${org}_${ts}.html`
 
       const blob = await put(pathname, htmlContent, {
         access: 'public',
@@ -74,13 +75,13 @@ export default async function handler(req, res) {
     /* ── GET: list reports ───────────────────────────────────────── */
     if (req.method === 'GET') {
       const { username } = req.query
-      const prefix = username ? `reports/${slugify(username)}/` : 'reports/'
+      const prefix = username ? `arap/reports/${slugify(username)}/` : 'arap/reports/'
       const { blobs } = await list({ prefix })
 
       const reports = blobs.map(b => {
-        const parts    = b.pathname.split('/')
-        const fileUser = parts[1] || 'unknown'
-        const filename = parts[2] || ''
+        const parts    = b.pathname.split('/')  // ['arap','reports','<user>','<file>']
+        const fileUser = parts[2] || 'unknown'
+        const filename = parts[3] || ''
         const segments = filename.replace('.html', '').split('_')
         const savedTs  = parseInt(segments[segments.length - 1], 10) || 0
         // Extract orgName from filename: YYYY-MM-DD_orgslug_ts → segments[1..n-1]

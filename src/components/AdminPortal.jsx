@@ -325,27 +325,27 @@ export default function AdminPortal({ session, onClose, onDownloadPDF, onSaveToC
     }
   }
 
-  function handleCreateUser(form) {
-    const result = createUser(form)
+  async function handleCreateUser(form) {
+    const result = await createUser(form)
     if (!result.ok) { showToast(result.error, 'error'); return }
     refresh()
     setModal(null)
-    showToast('User created successfully.')
+    showToast('User created & saved to cloud ☁')
   }
 
-  function handleEditUser(form) {
-    updateUser(modal.id, form)
+  async function handleEditUser(form) {
+    await updateUser(modal.id, form)
     refresh()
     setModal(null)
-    showToast('User updated.')
+    showToast('User updated & saved to cloud ☁')
   }
 
-  function handleDelete(userId) {
+  async function handleDelete(userId) {
     if (userId === session.userId) { showToast('Cannot delete your own account.', 'error'); return }
-    deleteUser(userId)
+    await deleteUser(userId)
     refresh()
     setConfirmDelete(null)
-    showToast('User deleted.')
+    showToast('User deleted from cloud ☁')
   }
 
   // ── Stats ──
