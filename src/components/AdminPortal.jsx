@@ -99,13 +99,39 @@ function UserModal({ user, onSave, onClose }) {
 }
 
 // ─── ASSESSMENT DETAIL MODAL ─────────────────────────────────────────────────
-function AssessmentModal({ assessment, onClose }) {
+function AssessmentModal({ assessment, onClose, onDownloadPDF }) {
   const [tab, setTab] = useState('summary')
   if (!assessment) return null
 
-  const fnScores = assessment.fnScores || {}
+  const fnScores  = assessment.fnScores  || {}
   const dimScores = assessment.orgDimScores || {}
   const DIMS_LABELS = { DQ: 'Data Quality', TR: 'Tech Readiness', TS: 'Talent & Skills', GE: 'Governance & Ethics', CR: 'Change Readiness', VR: 'Value & ROI' }
+
+  // Flatten fnScores for PDF: { id: { overall } } → { id: score }
+  function flatFn(raw) {
+    const out = {}
+    Object.entries(raw).forEach(([id, val]) => {
+      if (val && typeof val === 'object' && val.overall != null) out[id] = val.overall
+      else if (typeof val === 'number') out[id] = val
+    })
+    return out
+  }
+
+  function handlePDFDownload() {
+    if (!onDownloadPDF) return
+    onDownloadPDF({
+      orgName:        assessment.orgName || 'Organisation',
+      industry:       assessment.industry,
+      region:         assessment.region,
+      orgSize:        assessment.size || 'medium',
+      overallScore:   assessment.orgOverall || 1.0,
+      dimScores:      dimScores,
+      functionScores: flatFn(fnScores),
+      assessedBy:     assessment.username,
+      completedAt:    assessment.savedAt || Date.now(),
+      assessmentId:   assessment.id || '',
+    })
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
@@ -115,7 +141,16 @@ function AssessmentModal({ assessment, onClose }) {
             <div style={{ fontSize: 11, color: C.muted, fontFamily: 'monospace', marginBottom: 2 }}>{assessment.id}</div>
             <h3 style={{ margin: 0, color: C.text, fontSize: 17, fontWeight: 700 }}>{assessment.orgName || 'Unknown Org'}</h3>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {onDownloadPDF && (
+              <button
+                onClick={handlePDFDownload}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: C.accent, border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer' }}>
+                ⬇ Download PDF
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>
+          </div>
         </div>
         <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', gap: 8 }}>
           {['summary', 'dimensions', 'functions'].map(t => (
@@ -184,7 +219,7 @@ function AssessmentModal({ assessment, onClose }) {
 }
 
 // ─── MAIN ADMIN PORTAL ───────────────────────────────────────────────────────
-export default function AdminPortal({ session, onClose }) {
+export default function AdminPortal({ session, onClose, onDownloadPDF }) {
   const [tab, setTab] = useState('dashboard')
   const [users, setUsers] = useState([])
   const [assessments, setAssessments] = useState([])
@@ -262,7 +297,7 @@ export default function AdminPortal({ session, onClose }) {
           onClose={() => setModal(null)}
         />
       )}
-      {viewAssessment && <AssessmentModal assessment={viewAssessment} onClose={() => setViewAssessment(null)} />}
+      {viewAssessment && <AssessmentModal assessment={viewAssessment} onClose={() => setViewAssessment(null)} onDownloadPDF={onDownloadPDF} />}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 28, maxWidth: 360, width: '100%' }}>

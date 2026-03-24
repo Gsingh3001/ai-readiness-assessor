@@ -339,54 +339,64 @@ export default function App() {
     return record
   }
 
-  async function handleDownloadPDF() {
-    if (!session || session.role !== 'admin') return
-    setPdfProgress('Preparing vector PDF report…')
-    try {
-      const { pdf }                  = await import('@react-pdf/renderer')
-      const { default: PDFDocument } = await import('./components/pdf/PDFDocument.jsx')
+  // Flatten fnScores { id: { overall, dimScores } } → { id: score } for PDF
+  function flattenFnScores(raw) {
+    const out = {}
+    Object.entries(raw || {}).forEach(([id, val]) => {
+      if (val && typeof val === 'object' && val.overall != null) out[id] = val.overall
+      else if (typeof val === 'number') out[id] = val
+    })
+    return out
+  }
 
-      const assessmentData = {
-        orgName:         config.org || 'Organisation',
-        industry:        config.industry,
-        region:          REGIONS.find(r => r.id === config.region)?.label || config.region,
-        orgSize:         config.size || 'medium',
-        overallScore:    orgOverall,
-        dimScores:       orgDimScores,
-        functionScores:  fnScores,
-        assessedBy:      session.name || session.username,
-        completedAt:     Date.now(),
+  // handleDownloadPDF — HTML-to-print approach (same as itil4-assessor)
+  // window.open MUST be called synchronously (before any await) to avoid popup blockers
+  async function handleDownloadPDF(overrideData = null) {
+    if (!session || session.role !== 'admin') return
+
+    // Open window synchronously within user gesture — popup blockers require this
+    const win = window.open('', '_blank', 'width=1100,height=900,scrollbars=yes,resizable=yes')
+    if (!win) {
+      showToast('Enable pop-ups for this site, then try again.', 'error')
+      return
+    }
+    win.document.write(`<html><body style="background:#0A0E1A;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:16px;">
+      <div style="font-size:32px;">◈</div>
+      <div style="font-size:18px;font-weight:700;">Generating AI Readiness Report…</div>
+      <div style="font-size:13px;color:#94a3b8;">This will take a moment</div>
+    </body></html>`)
+
+    try {
+      const { generateAIReadinessPDFHTML } = await import('./components/PDFGeneratorHTML.js')
+
+      const assessmentData = overrideData || {
+        orgName:        config.org || 'Organisation',
+        industry:       config.industry,
+        region:         REGIONS.find(r => r.id === config.region)?.label || config.region,
+        orgSize:        config.size || 'medium',
+        overallScore:   orgOverall,
+        dimScores:      orgDimScores,
+        functionScores: flattenFnScores(fnScores),
+        assessedBy:     session.name || session.username,
+        completedAt:    Date.now(),
+        assessmentId:   '',
       }
 
-      setPdfProgress('Rendering pages…')
-      const doc = React.createElement(PDFDocument, { assessmentData })
-      const blob = await pdf(doc).toBlob()
-
-      const dateStr  = new Date().toISOString().slice(0,10)
-      const safeName = (config.org || 'Organisation').replace(/[^a-z0-9]/gi, '-')
-      const filename = `${safeName}-AI-Readiness-Report-${dateStr}.pdf`
-
-      const url  = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href     = url
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      showToast('PDF report downloaded!', 'success')
+      const html = generateAIReadinessPDFHTML(assessmentData)
+      win.document.open()
+      win.document.write(html)
+      win.document.close()
+      showToast('Report ready — press Ctrl+P to save as PDF', 'success')
     } catch(e) {
       console.error('PDF error:', e)
-      showToast('PDF generation failed. Check console.', 'error')
-    } finally {
-      setPdfProgress(null)
+      win.close()
+      showToast('Report generation failed. Check console.', 'error')
     }
   }
 
   // ── ADMIN PORTAL overlay ──
   if (showAdmin && session?.role === 'admin') {
-    return <AdminPortal session={session} onClose={() => setShowAdmin(false)} />
+    return <AdminPortal session={session} onClose={() => setShowAdmin(false)} onDownloadPDF={handleDownloadPDF} />
   }
 
   // ── LOGIN ──
