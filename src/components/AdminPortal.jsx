@@ -99,8 +99,10 @@ function UserModal({ user, onSave, onClose }) {
 }
 
 // ─── ASSESSMENT DETAIL MODAL ─────────────────────────────────────────────────
-function AssessmentModal({ assessment, onClose, onDownloadPDF }) {
+function AssessmentModal({ assessment, onClose, onDownloadPDF, onSaveToCloud }) {
   const [tab, setTab] = useState('summary')
+  const [saving, setSaving] = useState(false)
+  const [cloudUrl, setCloudUrl] = useState(null)
   if (!assessment) return null
 
   const fnScores  = assessment.fnScores  || {}
@@ -133,6 +135,25 @@ function AssessmentModal({ assessment, onClose, onDownloadPDF }) {
     })
   }
 
+  async function handleSaveCloud() {
+    if (!onSaveToCloud || saving) return
+    setSaving(true)
+    const data = await onSaveToCloud({
+      orgName:        assessment.orgName || 'Organisation',
+      industry:       assessment.industry,
+      region:         assessment.region,
+      orgSize:        assessment.size || 'medium',
+      overallScore:   assessment.orgOverall || 1.0,
+      dimScores:      dimScores,
+      functionScores: flatFn(fnScores),
+      assessedBy:     assessment.username,
+      completedAt:    assessment.savedAt || Date.now(),
+      assessmentId:   assessment.id || '',
+    })
+    if (data?.url) setCloudUrl(data.url)
+    setSaving(false)
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, width: '100%', maxWidth: 700, maxHeight: '90vh', overflowY: 'auto' }}>
@@ -141,7 +162,23 @@ function AssessmentModal({ assessment, onClose, onDownloadPDF }) {
             <div style={{ fontSize: 11, color: C.muted, fontFamily: 'monospace', marginBottom: 2 }}>{assessment.id}</div>
             <h3 style={{ margin: 0, color: C.text, fontSize: 17, fontWeight: 700 }}>{assessment.orgName || 'Unknown Org'}</h3>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {onSaveToCloud && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  onClick={handleSaveCloud}
+                  disabled={saving}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: saving ? '#334155' : C.green, border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#fff', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                  {saving ? '⏳ Uploading…' : '☁ Save to Cloud'}
+                </button>
+                {cloudUrl && (
+                  <a href={cloudUrl} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 11, color: C.green, fontWeight: 700, textDecoration: 'none', padding: '4px 8px', background: `${C.green}18`, border: `1px solid ${C.green}44`, borderRadius: 6 }}>
+                    ✓ View Report
+                  </a>
+                )}
+              </div>
+            )}
             {onDownloadPDF && (
               <button
                 onClick={handlePDFDownload}
@@ -219,7 +256,7 @@ function AssessmentModal({ assessment, onClose, onDownloadPDF }) {
 }
 
 // ─── MAIN ADMIN PORTAL ───────────────────────────────────────────────────────
-export default function AdminPortal({ session, onClose, onDownloadPDF }) {
+export default function AdminPortal({ session, onClose, onDownloadPDF, onSaveToCloud }) {
   const [tab, setTab] = useState('dashboard')
   const [users, setUsers] = useState([])
   const [assessments, setAssessments] = useState([])
@@ -227,6 +264,9 @@ export default function AdminPortal({ session, onClose, onDownloadPDF }) {
   const [viewAssessment, setViewAssessment] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [toast, setToast] = useState(null)
+  const [cloudReports, setCloudReports] = useState(null)   // null = not loaded
+  const [cloudLoading, setCloudLoading] = useState(false)
+  const [deletingBlob, setDeletingBlob] = useState(null)
 
   useEffect(() => {
     refresh()
@@ -239,7 +279,36 @@ export default function AdminPortal({ session, onClose, onDownloadPDF }) {
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
-    setTimeout(() => setToast(null), 3000)
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  async function fetchCloudReports() {
+    setCloudLoading(true)
+    try {
+      const res = await fetch('/api/reports')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setCloudReports(Array.isArray(data) ? data : [])
+    } catch(e) {
+      showToast(`Failed to load cloud reports: ${e.message}`, 'error')
+      setCloudReports([])
+    } finally {
+      setCloudLoading(false)
+    }
+  }
+
+  async function deleteCloudReport(pathname) {
+    setDeletingBlob(pathname)
+    try {
+      const res = await fetch(`/api/reports?pathname=${encodeURIComponent(pathname)}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setCloudReports(prev => prev.filter(r => r.pathname !== pathname))
+      showToast('Report deleted from cloud.')
+    } catch(e) {
+      showToast(`Delete failed: ${e.message}`, 'error')
+    } finally {
+      setDeletingBlob(null)
+    }
   }
 
   function handleCreateUser(form) {
@@ -278,7 +347,13 @@ export default function AdminPortal({ session, onClose, onDownloadPDF }) {
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'users',     label: `Users (${totalUsers})` },
     { id: 'history',   label: `Assessments (${totalAssessments})` },
+    { id: 'cloud',     label: '☁ Cloud Reports' },
   ]
+
+  function handleTabChange(id) {
+    setTab(id)
+    if (id === 'cloud' && cloudReports === null) fetchCloudReports()
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: C.bg, overflowY: 'auto', zIndex: 900, fontFamily: "'Segoe UI', Inter, system-ui, sans-serif" }}>
@@ -297,7 +372,7 @@ export default function AdminPortal({ session, onClose, onDownloadPDF }) {
           onClose={() => setModal(null)}
         />
       )}
-      {viewAssessment && <AssessmentModal assessment={viewAssessment} onClose={() => setViewAssessment(null)} onDownloadPDF={onDownloadPDF} />}
+      {viewAssessment && <AssessmentModal assessment={viewAssessment} onClose={() => setViewAssessment(null)} onDownloadPDF={onDownloadPDF} onSaveToCloud={onSaveToCloud} />}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 28, maxWidth: 360, width: '100%' }}>
@@ -325,7 +400,7 @@ export default function AdminPortal({ session, onClose, onDownloadPDF }) {
       {/* Tabs */}
       <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: '0 24px', display: 'flex', gap: 0 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+          <button key={t.id} onClick={() => handleTabChange(t.id)}
             style={{ padding: '14px 20px', background: 'none', border: 'none', borderBottom: tab === t.id ? `2px solid ${C.accent}` : '2px solid transparent', fontSize: 13, fontWeight: tab === t.id ? 700 : 400, color: tab === t.id ? C.accent : C.muted, cursor: 'pointer' }}>
             {t.label}
           </button>
@@ -421,6 +496,79 @@ export default function AdminPortal({ session, onClose, onDownloadPDF }) {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* ── CLOUD REPORTS TAB ── */}
+        {tab === 'cloud' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ margin: '0 0 4px', color: C.text, fontSize: 20, fontWeight: 700 }}>Cloud Reports</h2>
+                <div style={{ fontSize: 12, color: C.muted }}>HTML reports stored in Vercel Blob — publicly accessible, shareable links</div>
+              </div>
+              <button onClick={fetchCloudReports} disabled={cloudLoading}
+                style={{ padding: '8px 16px', background: `${C.blue}22`, border: `1px solid ${C.blue}44`, borderRadius: 8, fontSize: 12, fontWeight: 700, color: C.blue, cursor: cloudLoading ? 'default' : 'pointer', opacity: cloudLoading ? 0.6 : 1 }}>
+                {cloudLoading ? '⏳ Loading…' : '↺ Refresh'}
+              </button>
+            </div>
+            {cloudLoading && cloudReports === null ? (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '40px', textAlign: 'center', color: C.muted, fontSize: 14 }}>
+                Loading cloud reports…
+              </div>
+            ) : cloudReports && cloudReports.length === 0 ? (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '48px', textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>☁</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>No cloud reports yet</div>
+                <div style={{ fontSize: 13, color: C.muted }}>Open an assessment and click <strong style={{ color: C.green }}>☁ Save to Cloud</strong> to upload a report.</div>
+              </div>
+            ) : cloudReports && cloudReports.length > 0 ? (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                      {['Organisation', 'Uploaded By', 'Date', 'Size', 'Actions'].map(h => (
+                        <th key={h} style={{ padding: '10px 16px', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'left', textTransform: 'uppercase', letterSpacing: 1 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cloudReports.map(r => (
+                      <tr key={r.pathname} style={{ borderBottom: `1px solid ${C.border}` }}>
+                        <td style={{ padding: '12px 16px', fontSize: 13, color: C.text, fontWeight: 600 }}>
+                          {r.orgName ? r.orgName.replace(/-/g, ' ') : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: C.muted, fontFamily: 'monospace' }}>{r.username}</td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: C.muted }}>
+                          {new Date(r.savedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: C.muted }}>
+                          {r.size ? `${Math.round(r.size / 1024)} KB` : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <a href={r.url} target="_blank" rel="noreferrer"
+                              style={{ fontSize: 11, padding: '4px 10px', background: `${C.green}22`, border: `1px solid ${C.green}44`, borderRadius: 6, color: C.green, textDecoration: 'none', fontWeight: 700 }}>
+                              View
+                            </a>
+                            <button
+                              onClick={() => deleteCloudReport(r.pathname)}
+                              disabled={deletingBlob === r.pathname}
+                              style={{ fontSize: 11, padding: '4px 10px', background: `${C.red}22`, border: `1px solid ${C.red}44`, borderRadius: 6, color: C.red, cursor: 'pointer', fontWeight: 700 }}>
+                              {deletingBlob === r.pathname ? '…' : 'Delete'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '40px', textAlign: 'center', color: C.muted, fontSize: 14 }}>
+                Click Refresh to load cloud reports.
+              </div>
+            )}
           </div>
         )}
 

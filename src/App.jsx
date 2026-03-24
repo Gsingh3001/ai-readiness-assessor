@@ -406,9 +406,52 @@ export default function App() {
     }
   }
 
+  // handleSaveToCloud — generates HTML report and uploads to Vercel Blob
+  async function handleSaveToCloud(overrideData = null) {
+    if (!session || session.role !== 'admin') return null
+    try {
+      const { generateAIReadinessPDFHTML } = await import('./components/PDFGeneratorHTML.js')
+      const assessmentData = overrideData || {
+        orgName:        config.org || 'Organisation',
+        industry:       config.industry,
+        region:         REGIONS.find(r => r.id === config.region)?.label || config.region,
+        orgSize:        config.size || 'medium',
+        overallScore:   orgOverall,
+        dimScores:      orgDimScores,
+        functionScores: flattenFnScores(fnScores),
+        assessedBy:     session.name || session.username,
+        completedAt:    Date.now(),
+        assessmentId:   '',
+        goals:          config.goals || [],
+      }
+      const html = generateAIReadinessPDFHTML(assessmentData)
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          htmlContent: html,
+          username:    session.username || 'admin',
+          orgName:     assessmentData.orgName,
+          timestamp:   Date.now(),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || err.error || `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      showToast('Report saved to cloud!', 'success')
+      return data
+    } catch(e) {
+      console.error('Cloud save error:', e)
+      showToast(`Cloud save failed: ${e.message}`, 'error')
+      return null
+    }
+  }
+
   // ── ADMIN PORTAL overlay ──
   if (showAdmin && session?.role === 'admin') {
-    return <AdminPortal session={session} onClose={() => setShowAdmin(false)} onDownloadPDF={handleDownloadPDF} />
+    return <AdminPortal session={session} onClose={() => setShowAdmin(false)} onDownloadPDF={handleDownloadPDF} onSaveToCloud={handleSaveToCloud} />
   }
 
   // ── LOGIN ──
